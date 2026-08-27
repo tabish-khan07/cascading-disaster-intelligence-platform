@@ -1,0 +1,19 @@
+{
+  "files": [
+    "README.md",
+    "cascade_engine.py",
+    "disaster_pipeline.py",
+    "hazard_engine.py",
+    "priority_engine.py",
+    "requirements.txt",
+    "resource_optimizer.py",
+    "test_pipeline.py"
+  ],
+  "entry_point": "disaster_pipeline.py::run_disaster_pipeline",
+  "backend_input": {
+    "rainfall_mm": "number",
+    "duration_hours": "number",
+    "water_level_m": "number"
+  },
+  "api_recommendation": "POST /api/disaster/analyze"
+}

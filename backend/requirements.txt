@@ -1,0 +1,2 @@
+# AI/decision layer currently uses Python standard-library modules only.
+# Backend/frontend dependencies should be managed by the backend project.

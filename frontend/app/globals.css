@@ -1,42 +1,62 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 :root {
-  --background: #060d1b;
+  --background: #07111e;
   --foreground: #f8fafc;
+  --gov-navy-950: #040912;
+  --gov-navy-900: #07111e;
+  --gov-navy-850: #0a1728;
+  --gov-navy-800: #0c192c;
+  --gov-navy-750: #10223b;
+  --gov-border: #1b3353;
+  --gov-border-strong: #274872;
+  --india-saffron: #ff9933;
+  --india-green: #138808;
+  --ashoka-blue: #0284c7;
+}
+
+/* LEAFLET CONTAINER HARD SIZING TO PREVENT BLANK TILES */
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  background-color: #07111e !important;
+  border-radius: 4px;
+  z-index: 0;
 }
 
 body {
-  background: #060d1b;
+  background: #07111e;
   color: #f8fafc;
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   overflow-x: hidden;
 }
 
-/* GOVERNMENT EXECUTIVE SHADOWS & CARDS */
+/* GOVERNMENT EXECUTIVE SHADOWS & CARDS (GIGW 3.0 / NIDM STANDARD) */
 .gov-card {
-  background: rgba(13, 26, 48, 0.92);
-  border: 1px solid rgba(51, 85, 136, 0.35);
-  box-shadow: 0 10px 30px -5px rgba(2, 6, 23, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  background: #0c192c;
+  border: 1px solid #1b3353;
+  border-radius: 4px;
+  box-shadow: none;
 }
 
 .gov-card-hover:hover {
-  border-color: rgba(59, 130, 246, 0.5);
+  border-color: #274872;
 }
 
 /* TACTICAL LEAFLET POPUP OVERRIDES */
 .leaflet-popup-content-wrapper {
-  background: rgba(10, 20, 38, 0.96) !important;
-  color: #f1f5f9 !important;
-  border: 1px solid rgba(59, 130, 246, 0.4) !important;
-  border-radius: 12px !important;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.6) !important;
-  backdrop-filter: blur(12px) !important;
+  background: #0c192c !important;
+  color: #f8fafc !important;
+  border: 1px solid #1b3353 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5) !important;
   padding: 4px !important;
 }
 
 .leaflet-popup-tip {
-  background: rgba(10, 20, 38, 0.96) !important;
-  border: 1px solid rgba(59, 130, 246, 0.4) !important;
+  background: #0c192c !important;
+  border: 1px solid #1b3353 !important;
 }
 
 .leaflet-popup-close-button {
@@ -49,10 +69,10 @@ body {
 }
 
 .leaflet-tooltip {
-  background: rgba(10, 20, 38, 0.92) !important;
+  background: #0f141f !important;
   color: #f8fafc !important;
-  border: 1px solid rgba(59, 130, 246, 0.4) !important;
-  border-radius: 6px !important;
+  border: 1px solid #263045 !important;
+  border-radius: 4px !important;
   font-size: 11px !important;
   font-weight: 700 !important;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5) !important;
@@ -60,9 +80,185 @@ body {
 }
 
 .leaflet-tooltip-top:before,
-.leaflet-tooltip-bottom:before {
-  border-top-color: rgba(10, 20, 38, 0.92) !important;
-  border-bottom-color: rgba(10, 20, 38, 0.92) !important;
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+  border-top-color: #0f141f !important;
+  border-bottom-color: #0f141f !important;
+  border-left-color: #0f141f !important;
+  border-right-color: #0f141f !important;
+}
+
+/* OPERATIONAL TACTICAL MAP TOOLTIPS (SEOC / DDMA / NDRF VISUAL HIERARCHY) */
+.tooltip-village-cutoff,
+.tooltip-village-safe,
+.tooltip-shelter,
+.tooltip-shelter-overflow,
+.tooltip-hospital,
+.tooltip-hospital-cutoff,
+.tooltip-cwc-gauge,
+.tooltip-road-blocked,
+.tooltip-route-evac {
+  white-space: nowrap !important;
+  pointer-events: none !important;
+  line-height: 1.25 !important;
+}
+
+.tooltip-village-cutoff {
+  background: #1c0a0e !important;
+  color: #fecdd3 !important;
+  border: 1.5px solid #ef4444 !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.02em !important;
+  padding: 2px 6px !important;
+  box-shadow: none !important;
+}
+
+.tooltip-village-safe {
+  background: #081525 !important;
+  color: #bae6fd !important;
+  border: 1px solid #0284c7 !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 2px 6px !important;
+  box-shadow: none !important;
+}
+
+.tooltip-shelter {
+  background: #140d24 !important;
+  color: #f3e8ff !important;
+  border: 1px solid #9333ea !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 2px 6px !important;
+  box-shadow: none !important;
+}
+
+.tooltip-shelter-overflow {
+  background: #240b12 !important;
+  color: #fecdd3 !important;
+  border: 1.5px solid #e11d48 !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  padding: 2px 6px !important;
+  box-shadow: none !important;
+}
+
+.tooltip-hospital {
+  background: #061f12 !important;
+  color: #dcfce7 !important;
+  border: 1px solid #16a34a !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 2px 6px !important;
+  box-shadow: none !important;
+}
+
+.tooltip-hospital-cutoff {
+  background: #211107 !important;
+  color: #ffedd5 !important;
+  border: 1.5px solid #ea580c !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  padding: 2px 6px !important;
+  box-shadow: none !important;
+}
+
+.tooltip-cwc-gauge {
+  background: #061924 !important;
+  color: #e0f2fe !important;
+  border: 1.5px solid #0284c7 !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  font-family: monospace !important;
+  padding: 2px 6px !important;
+  box-shadow: none !important;
+}
+
+.tooltip-road-blocked {
+  background: #23080c !important;
+  color: #fee2e2 !important;
+  border: 1.5px solid #ef4444 !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  font-family: monospace !important;
+  padding: 2px 6px !important;
+  box-shadow: none !important;
+}
+
+.tooltip-route-evac {
+  background: #041f17 !important;
+  color: #d1fae5 !important;
+  border: 1.5px solid #10b981 !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  font-family: monospace !important;
+  padding: 2px 6px !important;
+  box-shadow: none !important;
+}
+
+/* TACTICAL OPERATIONAL ASSET STATUS TOOLTIPS */
+.tooltip-asset-ready {
+  background: #041f17 !important;
+  color: #d1fae5 !important;
+  border: 1.5px solid #10b981 !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  font-family: monospace !important;
+  padding: 2px 6px !important;
+  box-shadow: none !important;
+}
+
+.tooltip-asset-enroute {
+  background: #261606 !important;
+  color: #fef3c7 !important;
+  border: 1.5px solid #f59e0b !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  font-family: monospace !important;
+  padding: 2px 6px !important;
+  box-shadow: none !important;
+}
+
+.tooltip-asset-busy {
+  background: #260a10 !important;
+  color: #fecdd3 !important;
+  border: 1.5px solid #ef4444 !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  font-family: monospace !important;
+  padding: 2px 6px !important;
+  box-shadow: none !important;
+}
+
+.tooltip-asset-offline {
+  background: #0f172a !important;
+  color: #94a3b8 !important;
+  border: 1.5px solid #64748b !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  font-family: monospace !important;
+  padding: 2px 6px !important;
+  box-shadow: none !important;
+}
+
+.operational-asset-marker {
+  background: transparent !important;
+  border: none !important;
 }
 
 /* CUSTOM HIGH-TECH SCROLLBAR */
@@ -71,34 +267,14 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #060d1b;
+  background: #0b0f17;
 }
 ::-webkit-scrollbar-thumb {
   background: #1e325a;
-  border-radius: 9999px;
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #2563eb;
-}
-
-/* RADAR PING ANIMATION */
-@keyframes radar-ping {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-  50% {
-    transform: scale(1.4);
-    opacity: 0.2;
-  }
-  100% {
-    transform: scale(1.8);
-    opacity: 0;
-  }
-}
-
-.animate-radar {
-  animation: radar-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
 /* TOUCH & MULTI-FINGER GESTURE SUPPORT */
@@ -110,24 +286,139 @@ body {
 }
 
 .leaflet-touch .leaflet-bar {
-  border: 1px solid rgba(59, 130, 246, 0.4) !important;
-  background: rgba(10, 20, 38, 0.9) !important;
-  backdrop-filter: blur(8px);
-  border-radius: 8px !important;
+  border: 1px solid #263045 !important;
+  background: #0f141f !important;
+  border-radius: 4px !important;
   overflow: hidden;
 }
 
 .leaflet-touch .leaflet-bar a {
-  background: rgba(10, 20, 38, 0.9) !important;
+  background: #0f141f !important;
   color: #93c5fd !important;
-  border-bottom: 1px solid rgba(59, 130, 246, 0.2) !important;
+  border-bottom: 1px solid #1e2638 !important;
   width: 32px !important;
   height: 32px !important;
   line-height: 32px !important;
 }
 
 .leaflet-touch .leaflet-bar a:hover {
-  background: rgba(30, 58, 138, 0.9) !important;
+  background: #1e293b !important;
   color: #ffffff !important;
 }
+
+/* ACCESSIBILITY & FOCUS VISIBLE RINGS */
+:focus-visible {
+  outline: 2px solid #38bdf8 !important;
+  outline-offset: 2px !important;
+}
+
+/* OFFICIAL GOVERNMENT SITREP PRINT STYLES */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Hide main UI, headers, maps, and action buttons during print */
+  header,
+  nav,
+  main > div:first-child,
+  .no-print,
+  button,
+  .leaflet-container {
+    display: none !important;
+  }
+
+  /* Expand the SITREP, IAP, and Executive Order Memo modals into full-width official A4 sheets */
+  #sitrep-print-container,
+  #iap-print-container,
+  #memo-print-container {
+    position: static !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+    backdrop-filter: none !important;
+  }
+
+  #sitrep-print-content,
+  #iap-print-content,
+  #memo-print-content {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: 2px solid #111827 !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
+    padding: 1.5rem !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  #sitrep-print-content *,
+  #iap-print-content *,
+  #memo-print-content * {
+    color: #000000 !important;
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  #sitrep-print-content strong,
+  #sitrep-print-content h1,
+  #sitrep-print-content h2,
+  #sitrep-print-content h3,
+  #sitrep-print-content h4,
+  #iap-print-content strong,
+  #iap-print-content h1,
+  #iap-print-content h2,
+  #iap-print-content h3,
+  #iap-print-content h4,
+  #memo-print-content strong,
+  #memo-print-content h1,
+  #memo-print-content h2,
+  #memo-print-content h3,
+  #memo-print-content h4 {
+    color: #000000 !important;
+    font-weight: 800 !important;
+  }
+
+  #sitrep-print-content .text-amber-400,
+  #sitrep-print-content .text-rose-400,
+  #sitrep-print-content .text-emerald-400,
+  #iap-print-content .text-amber-400,
+  #iap-print-content .text-rose-400,
+  #iap-print-content .text-emerald-400,
+  #memo-print-content .text-amber-400,
+  #memo-print-content .text-rose-400,
+  #memo-print-content .text-emerald-400 {
+    color: #000000 !important;
+    font-weight: 800 !important;
+  }
+}
+
+/* BULLETPROOF MODAL BACKDROP & DIALOG LAYER (ALWAYS TOP LEVEL) */
+.seoc-modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 99999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background-color: rgba(0, 0, 0, 0.88) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  padding: 0.75rem !important;
+  overflow-y: auto !important;
+}
+
+.seoc-modal-dialog {
+  position: relative !important;
+  z-index: 100000 !important;
+}
+
 

@@ -48,12 +48,21 @@ def predict_flood(
         CALIBRATOR.predict([raw_score])[0]
     )
 
-    flood_prediction = int(
-        calibrated_score >= THRESHOLD
+    above_threshold = bool(calibrated_score >= THRESHOLD)
+    ml_status = (
+        "ABOVE_EARLY_WARNING_THRESHOLD (high-sensitivity mode)"
+        if above_threshold
+        else "BELOW_THRESHOLD"
     )
+
+    flood_prediction = int(above_threshold)
 
     return {
         "raw_score": raw_score,
         "calibrated_score": calibrated_score,
+        "decision_threshold": 0.012658,
+        "above_threshold": above_threshold,
+        "ml_status": ml_status,
+        "model_behaviour": "HIGH_RECALL_LOW_PRECISION (early-warning mode)",
         "flood_prediction": flood_prediction,
     }

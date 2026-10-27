@@ -1,16 +1,11 @@
+import time
 from math import radians, sin, cos, sqrt, atan2
+
+from ortools.linear_solver import pywraplp
 
 from cascade_engine import calculate_cascade, villages
 from priority_engine import calculate_priorities
-
-
-VILLAGE_NAMES = {
-    "V1": "Pipra Dewas",
-    "V2": "Sultanganj Diara",
-    "V3": "Manjhaul Lowlands",
-    "V4": "Mohanpur West",
-    "V5": "Rampur Ghat Diara",
-}
+from settlements import VILLAGE_NAMES, VILLAGE_LOCATIONS
 
 RESOURCE_LOCATIONS = {
     "A1": (25.1420, 85.9410),  # Barauni Staging Base
@@ -18,21 +13,18 @@ RESOURCE_LOCATIONS = {
     "A3": (25.1355, 85.9495),  # Sadar Hospital Base
     "R1": (25.1440, 85.9430),  # SDRF Flood Rescue Team 1
     "R2": (25.1510, 85.9580),  # NDRF Flood Rescue Team 2
+    "RB1": (25.1500, 85.9450),  # Barauni Ghat Launch Point
+    "RB2": (25.1560, 85.9560),  # Sultanganj Ghat Jetty
 }
 
-VILLAGE_LOCATIONS = {
-    "V1": (25.1480, 85.9428),  # Pipra Dewas
-    "V2": (25.1595, 85.9572),  # Sultanganj Diara
-    "V3": (25.1370, 85.9515),  # Manjhaul Lowlands
-    "V4": (25.1495, 85.9395),  # Mohanpur West
-    "V5": (25.1480, 85.9580),  # Rampur Ghat Diara (Dense Town Settlement West of A2)
-}
 
 AMBULANCES = ["A1", "A2", "A3"]
 RESCUE_TEAMS = ["R1", "R2"]
+RESCUE_BOATS = ["RB1", "RB2"]
 
 AVERAGE_AMBULANCE_SPEED_KMPH = 40.0
 AVERAGE_RESCUE_SPEED_KMPH = 30.0
+AVERAGE_BOAT_SPEED_KMPH = 15.0
 ROAD_DETOUR_FACTOR = 1.5
 
 
@@ -111,16 +103,19 @@ def calculate_assignment_cost(
     }
 
 
-def allocate_resources(
+def allocate_resources_greedy(
     priorities: list[dict],
     resources: list[str],
     average_speed_kmph: float,
+    blocked_village_ids: set[str] | None = None,
 ) -> list[dict]:
     if not priorities or not resources:
         return []
 
     remaining_villages = {
-        village["village_id"]: village for village in priorities
+        village["village_id"]: village
+        for village in priorities
+        if blocked_village_ids is None or village["village_id"] not in blocked_village_ids
     }
 
     allocations = []
@@ -147,15 +142,20 @@ def allocate_resources(
         village = remaining_villages.pop(best["village_id"])
         village_name = VILLAGE_NAMES.get(best["village_id"], best["village_id"])
 
-        resource_type = (
-            "AMBULANCE"
-            if resource_id.startswith("A")
-            else "RESCUE_BOAT"
-        )
+        if resource_id.startswith("A"):
+            resource_type = "AMBULANCE"
+            dispatch_mode = "ROAD_AMBULANCE"
+        elif resource_id.startswith("RB"):
+            resource_type = "RESCUE_BOAT"
+            dispatch_mode = "WATERCRAFT_IRB"
+        else:
+            resource_type = "RESCUE_TEAM"
+            dispatch_mode = "AMPHIBIOUS_IRB"
 
         allocations.append({
             "resource": best["resource"],
             "resource_type": resource_type,
+            "dispatch_mode": dispatch_mode,
             "village_id": best["village_id"],
             "village_name": village_name,
             "priority_score": village["priority_score"],
@@ -167,6 +167,7 @@ def allocate_resources(
             "reason": (
                 f"{village['priority_level']} priority at {village_name}, "
                 f"{village['population']:,} people exposed, "
+                f"dispatch via {dispatch_mode}, "
                 f"estimated travel time: {best['travel_time_min']} min"
             ),
         })
@@ -174,58 +175,256 @@ def allocate_resources(
     return allocations
 
 
+def allocate_resources_ortools(
+    priorities: list[dict],
+    resources: list[str],
+    average_speed_kmph: float,
+    blocked_village_ids: set[str] | None = None,
+) -> dict:
+    """
+    Uses Google OR-Tools SCIP integer programming solver.
+    Binary decision variable x[r,v] = 1 if resource r is assigned to village v.
+    Objective: maximize sum of (priority_score * 100 - travel_penalty) * x[r,v]
+    Constraints:
+      - Each resource assigned to at most 1 village
+      - Each village receives at most 1 resource of this type
+      - If blocked_village_ids is set, skip those villages
+    """
+    if not priorities or not resources:
+        return {"allocations": [], "solver_meta": {"solver": "SCIP", "status": "NO_INPUT", "variables": 0, "constraints": 0}}
+
+    # Filter villages based on road accessibility
+    eligible_villages = [
+        v for v in priorities
+        if blocked_village_ids is None or v["village_id"] not in blocked_village_ids
+    ]
+
+    if not eligible_villages:
+        return {"allocations": [], "solver_meta": {"solver": "SCIP", "status": "NO_ELIGIBLE_VILLAGES", "variables": 0, "constraints": 0}}
+
+    solver = pywraplp.Solver.CreateSolver("SCIP")
+    if not solver:
+        # Fallback to greedy if SCIP unavailable
+        fallback_allocs = allocate_resources_greedy(priorities, resources, average_speed_kmph, blocked_village_ids)
+        if isinstance(fallback_allocs, list):
+            return {
+                "allocations": fallback_allocs,
+                "solver_meta": {
+                    "solver": "SCIP (Fallback: Greedy)",
+                    "status": "FALLBACK",
+                    "variables": 0,
+                    "constraints": 0,
+                },
+            }
+        return fallback_allocs
+
+    start_time = time.time()
+
+    # Precompute assignment costs
+    costs = {}
+    for r in resources:
+        for v in eligible_villages:
+            cost_data = calculate_assignment_cost(r, v, average_speed_kmph)
+            costs[(r, v["village_id"])] = cost_data
+
+    # Decision variables: x[r, v_id] ∈ {0, 1}
+    x = {}
+    for r in resources:
+        for v in eligible_villages:
+            x[(r, v["village_id"])] = solver.BoolVar(f"x_{r}_{v['village_id']}")
+
+    # Constraint: Each resource assigned to at most 1 village
+    for r in resources:
+        solver.Add(
+            sum(x[(r, v["village_id"])] for v in eligible_villages) <= 1
+        )
+
+    # Constraint: Each village gets at most 1 resource of this type
+    for v in eligible_villages:
+        solver.Add(
+            sum(x[(r, v["village_id"])] for r in resources) <= 1
+        )
+
+    # Objective: maximize risk-weighted coverage minus travel penalty
+    objective = solver.Objective()
+    for r in resources:
+        for v in eligible_villages:
+            score = costs[(r, v["village_id"])]["assignment_score"]
+            objective.SetCoefficient(x[(r, v["village_id"])], score)
+    objective.SetMaximization()
+
+    status = solver.Solve()
+    solve_time_ms = round((time.time() - start_time) * 1000, 1)
+
+    num_variables = solver.NumVariables()
+    num_constraints = solver.NumConstraints()
+
+    if status not in (pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE):
+        return {
+            "allocations": [],
+            "solver_meta": {
+                "solver": "SCIP",
+                "status": "INFEASIBLE",
+                "variables": num_variables,
+                "constraints": num_constraints,
+                "solve_time_ms": solve_time_ms,
+            }
+        }
+
+    allocations = []
+    village_lookup = {v["village_id"]: v for v in eligible_villages}
+
+    for r in resources:
+        for v in eligible_villages:
+            if x[(r, v["village_id"])].solution_value() > 0.5:
+                vid = v["village_id"]
+                village = village_lookup[vid]
+                cost_data = costs[(r, vid)]
+                village_name = VILLAGE_NAMES.get(vid, vid)
+
+                if r.startswith("A"):
+                    resource_type = "AMBULANCE"
+                    dispatch_mode = "ROAD_AMBULANCE"
+                elif r.startswith("RB"):
+                    resource_type = "RESCUE_BOAT"
+                    dispatch_mode = "WATERCRAFT_IRB"
+                else:
+                    resource_type = "RESCUE_TEAM"
+                    dispatch_mode = "AMPHIBIOUS_IRB"
+
+                allocations.append({
+                    "resource": r,
+                    "resource_type": resource_type,
+                    "dispatch_mode": dispatch_mode,
+                    "village_id": vid,
+                    "village_name": village_name,
+                    "priority_score": village["priority_score"],
+                    "priority_level": village["priority_level"],
+                    "population": village["population"],
+                    "distance_km": cost_data["distance_km"],
+                    "estimated_travel_time_min": cost_data["travel_time_min"],
+                    "assignment_score": cost_data["assignment_score"],
+                    "reason": (
+                        f"{village['priority_level']} priority at {village_name}, "
+                        f"{village['population']:,} people exposed, "
+                        f"dispatch via {dispatch_mode}, "
+                        f"ETA: {cost_data['travel_time_min']} min"
+                    ),
+                })
+
+    solver_meta = {
+        "solver": "Google OR-Tools SCIP",
+        "status": "OPTIMAL" if status == pywraplp.Solver.OPTIMAL else "FEASIBLE",
+        "objective_value": round(solver.Objective().Value(), 3),
+        "variables": num_variables,
+        "constraints": num_constraints,
+        "solve_time_ms": solve_time_ms,
+    }
+
+    return {"allocations": allocations, "solver_meta": solver_meta}
+
+
+# Backwards compatibility alias
+allocate_resources = allocate_resources_ortools
+
+
 def optimize_resources(priorities: list[dict]) -> dict:
-    ambulance_allocations = allocate_resources(
+    # Identify which villages have road access severed
+    road_blocked_villages = {
+        v["village_id"] for v in priorities if v.get("road_impact", False)
+    }
+    road_accessible_villages = {
+        v["village_id"] for v in priorities if not v.get("road_impact", False)
+    }
+
+    # INTER-MODAL DISPATCH:
+    # Ambulances can ONLY go to villages with accessible roads
+    # Rescue boats are dispatched to villages with severed road access
+    ambulance_result = allocate_resources_ortools(
         priorities=priorities,
         resources=AMBULANCES,
         average_speed_kmph=AVERAGE_AMBULANCE_SPEED_KMPH,
+        blocked_village_ids=road_blocked_villages,  # lock out road-severed villages
     )
 
-    rescue_allocations = allocate_resources(
+    boat_result = allocate_resources_ortools(
+        priorities=priorities,
+        resources=RESCUE_BOATS,
+        average_speed_kmph=AVERAGE_BOAT_SPEED_KMPH,
+        blocked_village_ids=road_accessible_villages,  # boats only go to flooded areas
+    )
+
+    # Also send rescue teams (can go anywhere - they have IRBs)
+    rescue_result = allocate_resources_ortools(
         priorities=priorities,
         resources=RESCUE_TEAMS,
         average_speed_kmph=AVERAGE_RESCUE_SPEED_KMPH,
+        blocked_village_ids=None,  # rescue teams can go anywhere
     )
 
-    ambulance_covered = {
-        allocation["village_id"]
-        for allocation in ambulance_allocations
-    }
+    all_allocations = (
+        ambulance_result["allocations"]
+        + boat_result["allocations"]
+        + rescue_result["allocations"]
+    )
 
-    rescue_covered = {
-        allocation["village_id"]
-        for allocation in rescue_allocations
-    }
+    ambulance_covered = {a["village_id"] for a in ambulance_result["allocations"]}
+    boat_covered = {a["village_id"] for a in boat_result["allocations"]}
+    rescue_covered = {a["village_id"] for a in rescue_result["allocations"]}
 
-    all_villages = {
-        village["village_id"]: village for village in priorities
-    }
+    all_villages = {v["village_id"] for v in priorities}
+    any_covered = ambulance_covered | boat_covered | rescue_covered
 
-    ambulance_unserved = [
-        f"{vid} ({VILLAGE_NAMES.get(vid, vid)})"
-        for vid in sorted(set(all_villages.keys()) - ambulance_covered)
-    ]
-    rescue_unserved = [
-        f"{vid} ({VILLAGE_NAMES.get(vid, vid)})"
-        for vid in sorted(set(all_villages.keys()) - rescue_covered)
-    ]
+    unserved_boat = road_blocked_villages - boat_covered
+    unserved_ambulance = road_accessible_villages - ambulance_covered
+    unserved_villages = sorted(unserved_boat | unserved_ambulance)
 
-    allocations = ambulance_allocations + rescue_allocations
+    if unserved_villages:
+        unserved_actions = [
+            "Request additional IRBs / watercraft from NDRF 9th Bn or neighbouring districts",
+            "Pre-position Civil Defence / Home Guard teams at the nearest accessible high-ground point",
+            "Issue shelter-in-place advisory with increased monitoring frequency for the unserved villages",
+            "Consider helicopter or amphibious support if weather and assets permit",
+        ]
+    else:
+        unserved_actions = [
+            "All priority settlements currently covered",
+        ]
 
     return {
-        "status": "OPTIMIZED",
-        "allocations": allocations,
+        "status": "Optimal" if all_allocations else "No allocation possible",
+        "allocations": all_allocations,
+        "solver_meta": {
+            "ambulance_solver": ambulance_result.get("solver_meta", {}),
+            "boat_solver": boat_result.get("solver_meta", {}),
+            "rescue_solver": rescue_result.get("solver_meta", {}),
+        },
         "ambulance_coverage": {
-            "served_villages": [f"{vid} ({VILLAGE_NAMES.get(vid, vid)})" for vid in sorted(ambulance_covered)],
-            "unserved_villages": ambulance_unserved,
+            "served_villages": sorted(ambulance_covered),
+            "unserved_villages": sorted(all_villages - ambulance_covered),
             "total_resources": len(AMBULANCES),
-            "resources_used": len(ambulance_allocations),
+            "resources_used": len(ambulance_result["allocations"]),
+        },
+        "boat_coverage": {
+            "served_villages": sorted(boat_covered),
+            "unserved_villages": sorted(road_blocked_villages - boat_covered),
+            "total_resources": len(RESCUE_BOATS),
+            "resources_used": len(boat_result["allocations"]),
         },
         "rescue_team_coverage": {
-            "served_villages": [f"{vid} ({VILLAGE_NAMES.get(vid, vid)})" for vid in sorted(rescue_covered)],
-            "unserved_villages": rescue_unserved,
+            "served_villages": sorted(rescue_covered),
+            "unserved_villages": sorted(all_villages - rescue_covered),
             "total_resources": len(RESCUE_TEAMS),
-            "resources_used": len(rescue_allocations),
+            "resources_used": len(rescue_result["allocations"]),
+        },
+        "intermodal_dispatch": {
+            "road_ambulance_villages": sorted(ambulance_covered),
+            "watercraft_irb_villages": sorted(boat_covered),
+            "road_blocked_villages": sorted(road_blocked_villages),
+        },
+        "unserved_settlements": {
+            "villages": unserved_villages,
+            "recommended_actions": unserved_actions,
         },
     }
 
@@ -240,6 +439,12 @@ if __name__ == "__main__":
         print(
             f"{allocation['resource']} ({allocation['resource_type']}) -> "
             f"{allocation['village_name']} ({allocation['village_id']}) | "
+            f"Mode: {allocation.get('dispatch_mode', 'N/A')} | "
             f"Distance: {allocation['distance_km']} km | "
             f"ETA: {allocation['estimated_travel_time_min']} min"
         )
+    print("\nSolver Metadata:")
+    import pprint
+    pprint.pprint(result["solver_meta"])
+    print("\nInter-modal Dispatch:")
+    pprint.pprint(result["intermodal_dispatch"])

@@ -46,19 +46,19 @@ roads = {
 # Demo villages
 villages = {
     "V1": {
-        "population": 5000,
+        "population": 5420,
         "road": "R1",
         "lat": 28.4744,
         "lon": 77.5040,
     },
     "V2": {
-        "population": 3000,
+        "population": 7850,
         "road": "R2",
         "lat": 28.4820,
         "lon": 77.5100,
     },
     "V3": {
-        "population": 7000,
+        "population": 4200,
         "road": "R3",
         "lat": 28.4680,
         "lon": 77.5150,

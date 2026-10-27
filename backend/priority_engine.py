@@ -67,14 +67,22 @@ def calculate_priorities(cascade_result: dict) -> list[dict]:
     affected_villages = cascade_result["affected_villages"]
     affected_hospitals = cascade_result["affected_hospitals"]
 
+    # In baseline patrol mode (<0.30 risk and zero roads severed),
+    # no emergency dispatches are needed.
+    if risk_score < 0.30 and not affected_roads:
+        return []
+
+    # In active flood threat, assess all villages in the study basin
+    # so the OR-Tools solver can allocate ambulances to road-accessible villages
+    # and watercraft IRBs to road-severed villages.
     priorities = [
         calculate_village_priority(
-            village_id=village_id,
+            village_id=village.id,
             risk_score=risk_score,
             affected_road_ids=affected_roads,
             affected_hospital_ids=affected_hospitals,
         )
-        for village_id in affected_villages
+        for village in villages
     ]
 
     priorities.sort(
